@@ -47,7 +47,7 @@ The project is designed with the following components:
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/ManojGowda27/Realtime_Streaming.git
+    git clone https://github.com/ManojGowda27/Realtime_Data_Streaming.git
     ```
 
 2. Navigate to the project directory:
