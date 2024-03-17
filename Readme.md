@@ -10,7 +10,7 @@
 
 ## Introduction
 
-This project serves as a in detail guide to building an end-to-end data engineering pipeline using TCP/IP Socket, Apache Spark, OpenAI LLM, Kafka and Elasticsearch. It explains every stage from data acquisition, processing, sentiment analysis with ChatGPT, production to kafka topic and connection to elasticsearch.
+This project is a detailed guide for building an end-to-end data engineering pipeline using TCP/IP Socket, Apache Spark, OpenAI LLM, Kafka, and Elasticsearch. It explains every stage from data acquisition, processing, sentiment analysis with ChatGPT, production to Kafka topic, and connection to elasticsearch.
 
 ## System Architecture
 ![System_architecture.png](assets%2FSystem_architecture.png)
@@ -18,11 +18,11 @@ This project serves as a in detail guide to building an end-to-end data engineer
 The project is designed with the following components:
 
 - **Data Source**: I have used `yelp.com` dataset for the pipeline.
-- **TCP/IP Socket**: Used to stream data over the network in chunks
-- **Apache Spark**: For data processing with its master and worker nodes.
+- **TCP/IP Socket**: Used for streaming data over the network in chunks
+- **Apache Spark**: To process data with its master and worker nodes.
 - **Confluent Kafka**: Cluster on the cloud
 - **Control Center and Schema Registry**: Helps in monitoring and schema management of the Kafka streams.
-- **Kafka Connect**: For connecting to elasticsearch
+- **Kafka Connect**: For elasticsearch connection
 - **Elasticsearch**: For indexing and querying
 
 ## What I worked on
