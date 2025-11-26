@@ -5,6 +5,7 @@
 - [System Architecture](#system-architecture)
 - [What I worked on](#what-i-worked-on)
 - [Technologies](#technologies)
+- [Architectural Decisions & Trade-offs](#architectural-decisions-&-Trade-offs)
 - [Getting Started](#getting-started)
 
 
@@ -42,6 +43,22 @@ The project is designed with the following components:
 - Elasticsearch
 - Python
 - TCP/IP
+
+## Architectural Decisions & Trade-offs
+
+This pipeline was designed to simulate a real-world streaming environment while addressing specific engineering challenges regarding latency and data integrity. Below are the key design choices:
+
+### 1. Ingestion Strategy (TCP Socket vs. Kafka Source)
+* **Current Implementation:** The pipeline currently utilizes a TCP/IP socket connection to stream Yelp data into Apache Spark. This approach was chosen to simplify the simulation of a live data feed without the overhead of maintaining an external producer service.
+* **Production Consideration:** In a production environment, I would decouple the ingestion layer by placing a **Kafka Producer** at the source (before Spark). This would ensure data durability and replayability in the event of a Spark cluster failure, preventing data loss during downtime.
+
+### 2. Handling API Latency (OpenAI Integration)
+* **Challenge:** Integrating an external API (OpenAI GPT) within a high-throughput Spark streaming job introduces significant latency risks due to network I/O and rate limits.
+* **Optimization:** To mitigate backpressure, the system utilizes Spark's micro-batch architecture. By tuning the batch interval, we balance the need for "real-time" sentiment analysis against the blocking nature of synchronous API calls.
+
+### 3. Decoupling Storage via Kafka Connect
+* **Design Choice:** Rather than writing directly from Spark to Elasticsearch, processed data is written back to a Kafka topic, and a **Kafka Sink Connector** handles the ingestion into Elasticsearch.
+* **Benefit:** This creates a resilient architecture. If the Elasticsearch cluster undergoes maintenance or fails, the data persists in the Kafka topic (based on retention policies) and automatically resumes syncing once the sink is restored, ensuring zero data loss.
 
 ## Getting Started
 
