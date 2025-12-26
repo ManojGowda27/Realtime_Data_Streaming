@@ -1,79 +1,100 @@
-# Realtime Data Streaming With TCP Socket, Apache Spark, OpenAI LLM, Kafka and Elasticsearch | End-to-End Data Engineering Project
+# Real-Time Sentiment Analysis Pipeline | Apache Spark, Kafka, OpenAI & Elasticsearch
+This project demonstrates a production-grade data engineering pipeline designed for the real-time streaming, processing, and AI-driven sentiment analysis of Yelp reviews. Built using Apache Spark Structured Streaming, Kafka, and Docker, this system is engineered for resilience and scalability. It is important to note that this pipeline has evolved significantly from an initial TCP-based prototype into its current fault-tolerant Kafka streaming architecture.
 
 ## Table of Contents
 - [Introduction](#introduction)
 - [System Architecture](#system-architecture)
-- [What I worked on](#what-i-worked-on)
+- [Key Features](#key-features)
 - [Technologies](#technologies)
-- [Architectural Decisions & Trade-offs](#architectural-decisions-&-Trade-offs)
+- [Architectural Decisions & Evolution](#architectural-decisions--evolution)
 - [Getting Started](#getting-started)
-
 
 ## Introduction
 
-This project is a detailed guide for building an end-to-end data engineering pipeline using TCP/IP Socket, Apache Spark, OpenAI LLM, Kafka, and Elasticsearch. It explains every stage from data acquisition, processing, sentiment analysis with ChatGPT, production to Kafka topic, and connection to elasticsearch.
+This project demonstrates a production-grade data engineering pipeline for real-time sentiment analysis. It ingests high-volume Yelp review data, processes it via **Apache Spark Structured Streaming**, enriches it using **OpenAI's GPT model** for sentiment classification, and indexes the results in **Elasticsearch** for low-latency querying.
+
+The system is fully containerized using Docker and is designed to handle backpressure, data durability, and fault tolerance.
 
 ## System Architecture
-![System_architecture.png](assets%2FSystem_architecture.png)
 
-The project is designed with the following components:
+![Initial_architecture.png](assets%2FInitial_architecture.png)
 
-- **Data Source**: I have used `yelp.com` dataset for the pipeline.
-- **TCP/IP Socket**: Used for streaming data over the network in chunks
-- **Apache Spark**: To process data with its master and worker nodes.
-- **Confluent Kafka**: Cluster on the cloud
-- **Control Center and Schema Registry**: Helps in monitoring and schema management of the Kafka streams.
-- **Kafka Connect**: For elasticsearch connection
-- **Elasticsearch**: For indexing and querying
+![Updated_architecture.png](assets%2FUpdated_architecture.png)
 
-## What I worked on
 
-- Setting up data pipeline with TCP/IP 
-- Real-time data streaming with Apache Kafka
-- Data processing techniques with Apache Spark
-- Realtime sentiment analysis with OpenAI ChatGPT
-- Synchronising data from kafka to elasticsearch
-- Indexing and Querying data on elasticsearch
+The pipeline consists of four distinct stages:
+
+1.  **Ingestion Layer**: A Python-based **Kafka Producer** reads the Yelp dataset and pushes records to a `customers_review` Kafka topic. This decouples the data source from the processing layer, ensuring replayability.
+2.  **Processing Layer**: **Apache Spark** (Master/Worker cluster) consumes the Kafka stream. It performs schema enforcement, watermark handling for late data, and transformation.
+3.  **Enrichment Layer**: Spark makes asynchronous calls to the **OpenAI API** (GPT-3.5) to classify review sentiment (Positive/Negative/Neutral) in real-time.
+4.  **Storage & Serving**: Enriched data is written back to a separate Kafka topic (`customers_review_enriched`), where a **Kafka Connect** sink synchronizes it with **Elasticsearch** for analytics.
+
+## Key Features
+
+* **Fault-Tolerant Ingestion**: Migrated from legacy TCP Sockets to **Apache Kafka** to ensure zero data loss during consumer downtime.
+* **Distributed Processing**: Utilizes a custom-built Dockerized Spark Cluster (Master + Worker nodes) for scalable stream processing.
+* **Smart AI Integration**: Implements filtering logic (e.g., processing specific star ratings) to optimize OpenAI API costs and reduce latency.
+* **Schema Enforcement**: strict StructType definitions and Watermarking to handle out-of-order data and manage cluster memory efficiently.
+* **Infrastructure as Code**: Entire stack (Zookeeper, Broker, Spark, Connectors) defined via `docker-compose`.
 
 ## Technologies
 
-- Apache Spark
-- Confluent Kafka
-- Docker
-- Elasticsearch
-- Python
-- TCP/IP
+* **Language**: Python 3.9
+* **Stream Processing**: Apache Spark Structured Streaming 3.5.0
+* **Message Broker**: Apache Kafka (Confluent Platform)
+* **AI/LLM**: OpenAI GPT-3.5 Turbo
+* **Search Engine**: Elasticsearch
+* **Containerization**: Docker & Docker Compose
 
-## Architectural Decisions & Trade-offs
+## Architectural Decisions & Evolution
 
-This pipeline was designed to simulate a real-world streaming environment while addressing specific engineering challenges regarding latency and data integrity. Below are the key design choices:
+This pipeline has evolved from a TCP-based prototype to a resilient, distributed streaming architecture. Below are the key engineering decisions:
 
-### 1. Ingestion Strategy (TCP Socket vs. Kafka Source)
-* **Current Implementation:** The pipeline currently utilizes a TCP/IP socket connection to stream Yelp data into Apache Spark. This approach was chosen to simplify the simulation of a live data feed without the overhead of maintaining an external producer service.
-* **Production Consideration:** In a production environment, I would decouple the ingestion layer by placing a **Kafka Producer** at the source (before Spark). This would ensure data durability and replayability in the event of a Spark cluster failure, preventing data loss during downtime.
+### 1. Ingestion Strategy: Moving from Socket to Kafka
+* **Legacy Approach (MVP):** Initially utilized a raw TCP socket connection to stream JSON chunks directly into Spark. While simple, this created a tight coupling where any Spark downtime resulted in permanent data loss.
+* **Production Implementation:** Migrated to **Apache Kafka**. By placing a durable buffer between the source and the processing engine, we achieved **decoupling** and **replayability**. We can now restart the Spark cluster without losing a single review.
 
-### 2. Handling API Latency (OpenAI Integration)
-* **Challenge:** Integrating an external API (OpenAI GPT) within a high-throughput Spark streaming job introduces significant latency risks due to network I/O and rate limits.
-* **Optimization:** To mitigate backpressure, the system utilizes Spark's micro-batch architecture. By tuning the batch interval, we balance the need for "real-time" sentiment analysis against the blocking nature of synchronous API calls.
+### 2. Handling Late Data & Memory Management
+* **Challenge:** In streaming, data often arrives out of order. Keeping state indefinitely leads to Out-Of-Memory (OOM) errors.
+* **Solution:** Implemented **Watermarking** (10-minute threshold) on the event timestamp. This allows the engine to drop data that is too old to be relevant, keeping the state store small and efficient.
 
-### 3. Decoupling Storage via Kafka Connect
-* **Design Choice:** Rather than writing directly from Spark to Elasticsearch, processed data is written back to a Kafka topic, and a **Kafka Sink Connector** handles the ingestion into Elasticsearch.
-* **Benefit:** This creates a resilient architecture. If the Elasticsearch cluster undergoes maintenance or fails, the data persists in the Kafka topic (based on retention policies) and automatically resumes syncing once the sink is restored, ensuring zero data loss.
+### 3. API Latency Management
+* **Challenge:** Synchronous calls to OpenAI can block Spark executors, killing throughput.
+* **Optimization:** We utilize Spark's micro-batch architecture to batch API requests. Additionally, logic was added to filter high-value records (e.g., 1-star reviews) *before* the API call, significantly reducing cost and latency overhead.
 
 ## Getting Started
 
-1. Clone the repository:
+### Prerequisites
+* Docker Desktop (4GB+ RAM recommended)
+* OpenAI API Key
+
+### Installation
+
+1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/ManojGowda27/Realtime_Data_Streaming.git
+    git clone [https://github.com/ManojGowda27/Realtime_Data_Streaming.git](https://github.com/ManojGowda27/Realtime_Data_Streaming.git)
+    cd Realtime_Data_Streaming
     ```
 
-2. Navigate to the project directory:
+2.  **Configure API Keys:**
+    * Rename `config/config.example.py` to `config/config.py`.
+    * Add your OpenAI API key inside the file.
+
+3.  **Start the Infrastructure:**
     ```bash
-    cd src
+    docker-compose up -d --build
+    ```
+    *This will start Zookeeper, Kafka, Spark Master, and Spark Worker.*
+
+4.  **Start the Data Producer:**
+    ```bash
+    python jobs/kafka_producer.py
     ```
 
-3. Run Docker Compose to spin up the spark cluster:
+5.  **Submit the Spark Job:**
     ```bash
-    docker-compose up
+    docker exec -u 0 -it spark-master /opt/spark/bin/spark-submit \
+      --master spark://spark-master:7077 \
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+      /opt/spark/jobs/spark-streaming.py
     ```
-
