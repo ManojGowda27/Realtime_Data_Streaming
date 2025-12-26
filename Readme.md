@@ -16,9 +16,10 @@ This project demonstrates a production-grade data engineering pipeline for real-
 The system is fully containerized using Docker and is designed to handle backpressure, data durability, and fault tolerance.
 
 ## System Architecture
-
+**Initial Architecture**
 ![Initial_architecture.png](assets%2FInitial_architecture.png)
 
+**Updated Architecture**
 ![Updated_architecture.png](assets%2FUpdated_architecture.png)
 
 
