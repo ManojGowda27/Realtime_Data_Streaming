@@ -1,6 +1,17 @@
-.idea
-config.py
-venv
-.DS_Store
-__pycache__
-*.json
+# Ignore API Keys and Secrets
+config/config.py
+.env
+
+# Ignore Heavy Datasets
+datasets/
+
+# Ignore Python Cache and compiled files
+__pycache__/
+*.pyc
+
+# Ignore IDE settings
+.idea/
+.vscode/
+
+# Ignore Docker logs/checkpoints
+checkpoint/

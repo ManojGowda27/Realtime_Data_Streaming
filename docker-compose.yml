@@ -7,11 +7,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.spark
-    command: bin/spark-class org.apache.spark.deploy.master.Master
+    # Apache command to start Master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     volumes:
-      - ./config:/opt/bitnami/spark/config
-      - ./jobs:/opt/bitnami/spark/jobs
-      - ./datasets:/opt/bitnami/spark/datasets
+      # NOTE: Changed from /opt/bitnami/spark to /opt/spark
+      - ./config:/opt/spark/config
+      - ./jobs:/opt/spark/jobs
+      - ./datasets:/opt/spark/datasets
       - ./requirements.txt:/requirements.txt
     ports:
       - "9090:8080"
@@ -19,17 +21,18 @@ services:
     networks:
       - MG
 
-  spark-worker: &worker
+  spark-worker:
     container_name: spark-worker
     hostname: spark-worker
     build:
       context: .
       dockerfile: Dockerfile.spark
-    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    # Apache command to start Worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     volumes:
-      - ./config:/opt/bitnami/spark/config
-      - ./jobs:/opt/bitnami/spark/jobs
-      - ./datasets:/opt/bitnami/spark/datasets
+      - ./config:/opt/spark/config
+      - ./jobs:/opt/spark/jobs
+      - ./datasets:/opt/spark/datasets
       - ./requirements.txt:/requirements.txt
     depends_on:
       - spark-master
@@ -38,6 +41,39 @@ services:
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 1g
       SPARK_MASTER_URL: spark://spark-master:7077
+    networks:
+      - MG
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - MG
+
+  broker:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: broker
+    container_name: broker
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     networks:
       - MG
 
